@@ -695,7 +695,7 @@
     triggerBtn = dom('button', {
       type: 'button',
       className: 'agy-tb-trigger',
-      title: 'تنظیمات فارسی‌ساز و فونت وزیرمتن (Alt+Shift+R)',
+      title: 'RTL & Custom Font Settings (Alt+Shift+R)',
       'data-active': prefs.enabled ? '1' : '0',
       'data-open': '0',
       onClick: function (e) {
@@ -704,7 +704,7 @@
       }
     }, [
       dom('span', { className: 'agy-tb-dot' }),
-      dom('span', { text: 'فارسی' }),
+      dom('span', { text: 'RTL' }),
       createSlidersIcon()
     ]);
 
@@ -718,7 +718,7 @@
     });
     var header = dom('div', { className: 'agy-pop-header' }, [
       dom('div', { className: 'agy-pop-title-wrap' }, [
-        dom('div', { className: 'agy-pop-title', text: 'جعبه ابزار فارسی و وزیرمتن' }),
+        dom('div', { className: 'agy-pop-title', text: 'RTL & Font Studio' }),
         dom('div', { className: 'agy-pop-sub', text: 'Alt + Shift + R' })
       ]),
       uiRefs.masterSwitch
@@ -727,9 +727,9 @@
     // Direction Mode
     uiRefs.modeBtns = {};
     var modes = [
-      { id: 'smart', label: 'هوشمند' },
-      { id: 'auto', label: 'خودکار' },
-      { id: 'force', label: 'همیشه راست' }
+      { id: 'smart', label: 'Smart' },
+      { id: 'auto', label: 'Auto' },
+      { id: 'force', label: 'Force RTL' }
     ];
     var modeChildren = [];
     modes.forEach(function (item) {
@@ -747,7 +747,7 @@
       modeChildren.push(b);
     });
     var modeSec = dom('div', { className: 'agy-pop-section' }, [
-      dom('div', { className: 'agy-pop-label' }, [dom('span', { text: 'حالت تشخیص جهت متن' })]),
+      dom('div', { className: 'agy-pop-label' }, [dom('span', { text: 'Text Direction Mode' })]),
       dom('div', { className: 'agy-seg-group' }, modeChildren)
     ]);
 
@@ -760,18 +760,20 @@
         applyPrefsToRoot();
       }
     }, [
-      dom('option', { value: 'Vazirmatn', text: 'Vazirmatn (وزیرمتن - پیشنهادی)' }),
-      dom('option', { value: 'Vazir', text: 'Vazir (وزیر کلاسیک)' }),
-      dom('option', { value: 'Tahoma', text: 'Tahoma (تاهوما)' }),
-      dom('option', { value: 'Segoe UI', text: 'Segoe UI (پیش‌فرض ویندوز)' }),
-      dom('option', { value: 'custom', text: 'فونت دلخواه نصب‌شده روی سیستم...' })
+      dom('option', { value: 'Vazirmatn', text: 'Vazirmatn (Recommended RTL)' }),
+      dom('option', { value: 'Noto Sans Arabic', text: 'Noto Sans Arabic' }),
+      dom('option', { value: 'Cairo', text: 'Cairo' }),
+      dom('option', { value: 'Inter', text: 'Inter' }),
+      dom('option', { value: 'Tahoma', text: 'Tahoma' }),
+      dom('option', { value: 'Segoe UI', text: 'Segoe UI (System Default)' }),
+      dom('option', { value: 'custom', text: 'Custom installed system font...' })
     ]);
     uiRefs.fontSelect = fontSelect;
 
     var customFontInput = dom('input', {
       type: 'text',
       className: 'agy-custom-input',
-      placeholder: 'مثلاً: IRANSansX یا Yekan Bakh',
+      placeholder: 'e.g., Inter, Cairo, IRANSansX, Noto Sans',
       onInput: function (e) {
         prefs.customFont = e.target.value;
         savePrefs();
@@ -781,7 +783,7 @@
     uiRefs.customFontInput = customFontInput;
 
     var fontSec = dom('div', { className: 'agy-pop-section' }, [
-      dom('div', { className: 'agy-pop-label' }, [dom('span', { text: 'فونت نمایش فارسی' })]),
+      dom('div', { className: 'agy-pop-label' }, [dom('span', { text: 'Display Font' })]),
       dom('div', { className: 'agy-font-row' }, [fontSelect]),
       customFontInput
     ]);
@@ -789,7 +791,7 @@
     // Font Size Scale Stepper
     uiRefs.scaleLabel = dom('span', { className: 'agy-step-val', text: prefs.fontScale + '%' });
     var scaleSec = dom('div', { className: 'agy-pop-section' }, [
-      dom('div', { className: 'agy-pop-label' }, [dom('span', { text: 'اندازه نوشتار فارسی' })]),
+      dom('div', { className: 'agy-pop-label' }, [dom('span', { text: 'Font Size Scale' })]),
       dom('div', { className: 'agy-stepper' }, [
         dom('button', {
           type: 'button',
@@ -818,9 +820,9 @@
     // Line Height
     uiRefs.lhBtns = {};
     var lhs = [
-      { val: '1.6', label: 'فشرده' },
-      { val: '1.85', label: 'استاندارد' },
-      { val: '2.1', label: 'باز' }
+      { val: '1.6', label: 'Compact' },
+      { val: '1.85', label: 'Standard' },
+      { val: '2.1', label: 'Relaxed' }
     ];
     var lhChildren = [];
     lhs.forEach(function (item) {
@@ -838,7 +840,7 @@
       lhChildren.push(b);
     });
     var lhSec = dom('div', { className: 'agy-pop-section' }, [
-      dom('div', { className: 'agy-pop-label' }, [dom('span', { text: 'فاصله خطوط پاراگراف' })]),
+      dom('div', { className: 'agy-pop-label' }, [dom('span', { text: 'Paragraph Line Height' })]),
       dom('div', { className: 'agy-seg-group' }, lhChildren)
     ]);
 
@@ -865,13 +867,13 @@
       return { row: row, sw: sw };
     }
 
-    var digitsRow = makeToggleRow('نمایش اعداد فارسی (بدون تغییر کپی)', 'persianDigits', false);
+    var digitsRow = makeToggleRow('Localized Digits (copy-safe)', 'persianDigits', false);
     uiRefs.digitsSwitch = digitsRow.sw;
 
-    var inputRow = makeToggleRow('راست‌چین هوشمند کادر تایپ چت', 'rtlInput', true);
+    var inputRow = makeToggleRow('Smart RTL Chat Input', 'rtlInput', true);
     uiRefs.inputSwitch = inputRow.sw;
 
-    var codeRow = makeToggleRow('ایزوله کردن کدهای درون‌خطی (LTR)', 'isolateInlineCode', false);
+    var codeRow = makeToggleRow('Isolate Inline Code (LTR)', 'isolateInlineCode', false);
     uiRefs.codeSwitch = codeRow.sw;
 
     // Footer Buttons
@@ -879,7 +881,7 @@
       dom('button', {
         type: 'button',
         className: 'agy-foot-btn',
-        text: 'بازآرایی صفحه',
+        text: 'Rescan Page',
         onClick: function () {
           rescanAll();
         }
@@ -887,7 +889,7 @@
       dom('button', {
         type: 'button',
         className: 'agy-foot-btn',
-        text: 'بازنشانی پیش‌فرض',
+        text: 'Reset Defaults',
         onClick: function () {
           prefs = cloneDefaults();
           savePrefs();
