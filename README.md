@@ -2,7 +2,7 @@
 
 # فارسی‌ساز، فونت وزیرمتن و جعبه ابزار هوشمند Antigravity
 
-ابزار سبک، بدون وابستگی خارجی و **مقاوم در برابر آپدیت** برای راست‌چین‌سازی استاندارد (**RTL**) و نمایش فونت **وزیرمتن (Vazirmatn)** در محیط چت **Antigravity Desktop (2.0)** و **Antigravity IDE** روی ویندوز.
+ابزار سبک، بدون وابستگی خارجی و **مقاوم در برابر آپدیت** برای راست‌چین‌سازی استاندارد (**RTL**) و نمایش فونت **وزیرمتن (Vazirmatn)** در محیط چت **Antigravity Desktop (2.0)** و **Antigravity IDE** روی **ویندوز و لینوکس**.
 
 ![پیش‌نمایش فارسی‌ساز، فونت وزیرمتن و جعبه ابزار بالای Antigravity](docs/preview.png)
 
@@ -29,7 +29,7 @@
 
 ## پیش‌نیازها
 
-- سیستم‌عامل **ویندوز ۱۰ یا ۱۱**
+- سیستم‌عامل **ویندوز ۱۰ / ۱۱** یا **لینوکس**
 - **Python 3** نصب‌شده روی سیستم
 - **فونت Vazirmatn** (پیشنهادی برای نمایش آفلاین؛ در صورت نبودن، از Google Fonts بارگذاری می‌شود)
 
@@ -48,11 +48,26 @@ cd antigravity-persian-rtl
 
 <div dir="rtl">
 
-۲. روی فایل **`Install-RTL.bat`** دابل‌کلیک کنید:
+۲. **روی ویندوز:** روی فایل **`Install-RTL.bat`** دابل‌کلیک کنید:
 - شورتکات‌های **`Antigravity RTL`** و **`Antigravity IDE RTL`** روی دسکتاپ و منوی استارت ساخته می‌شوند.
 - نسخه **Antigravity IDE** و **Antigravity Desktop** پچ شده و برنامه با ظاهر فارسی، فونت وزیرمتن و جعبه ابزار بالای صفحه باز می‌شود.
 
-> از این پس برای باز کردن برنامه از شورتکات **`Antigravity RTL`** روی دسکتاپ استفاده کنید تا پس از هر بار آپدیت شدن Antigravity، فارسی‌سازی به‌طور خودکار حفظ شود.
+۳. **روی لینوکس:** اسکریپت نصب لینوکس را اجرا کنید:
+
+</div>
+
+```bash
+chmod +x install-rtl.sh patch-now.sh uninstall-rtl.sh antigravity_rtl.py
+./install-rtl.sh
+```
+
+<div dir="rtl">
+
+- مسیر نصب Antigravity به‌صورت خودکار (از جمله از روی اسکریپت‌های wrapper در `PATH` مثل `~/.local/bin/antigravity` و مسیرهای `/opt` و `~/.local/share`) شناسایی می‌شود.
+- شورتکات‌های `.desktop` با نام **`Antigravity RTL`** در `~/.local/share/applications/` (و دسکتاپ) ساخته می‌شوند و هنگام اجرا، فلگ‌های wrapper کاربر (مثل `--proxy-server` و `--no-sandbox`) حفظ می‌شوند.
+- برای مسیرهای سیستمی مثل `/opt/antigravity` می‌توانید با `sudo python3 antigravity_rtl.py patch --target all --no-shortcuts` پچ کرده و سپس با `python3 antigravity_rtl.py install-shortcuts` شورتکات کاربری بسازید.
+
+> از این پس برای باز کردن برنامه از شورتکات **`Antigravity RTL`** استفاده کنید تا پس از هر بار آپدیت شدن Antigravity، فارسی‌سازی به‌طور خودکار حفظ شود.
 
 ---
 
@@ -60,9 +75,9 @@ cd antigravity-persian-rtl
 
 | فایل | کاربرد |
 | --- | --- |
-| `Install-RTL.bat` | نصب تعاملی شورتکات‌های دسکتاپ و اعمال اولیه پچ |
-| `Patch-Now.bat` | بستن برنامه، اعمال فوری آخرین نسخه پچ و اجرای مجدد |
-| `Uninstall-RTL.bat` | حذف کامل شورتکات‌های RTL و بازگرداندن فایل‌های اصلی برنامه به حالت کارخانه (بایت‌به‌بایت) |
+| `Install-RTL.bat` / `install-rtl.sh` | نصب تعاملی شورتکات‌ها و اعمال اولیه پچ (ویندوز / لینوکس) |
+| `Patch-Now.bat` / `patch-now.sh` | اعمال فوری آخرین نسخه پچ (ویندوز / لینوکس) |
+| `Uninstall-RTL.bat` / `uninstall-rtl.sh` | حذف کامل شورتکات‌های RTL و بازگرداندن فایل‌های اصلی برنامه به حالت کارخانه (بایت‌به‌بایت) |
 | `antigravity_rtl.py` | موتور پچر خالص پایتون (`ASAR` + `IDE`)، مدیریت کش و شورتکات‌ها |
 | `assets/agy-rtl.css` | استایل فونت وزیرمتن، تایپوگرافی RTL و ظاهر جعبه ابزار بالای برنامه |
 | `assets/agy-rtl.js` | موتور `MutationObserver` و پنل تنظیمات زنده (کاملاً سازگار با `Trusted Types`) |

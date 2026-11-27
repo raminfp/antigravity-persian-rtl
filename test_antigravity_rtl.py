@@ -447,8 +447,45 @@ console.log('ALL_V2_TOOLBAR_AND_DOM_ASSERTIONS_PASSED');
         os.unlink(harness_path)
 
 
+def test_linux_wrapper_and_desktop_shortcuts() -> None:
+    import stat
+
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        desk_dir = root / "Antigravity-x64"
+        ide_dir = root / "Antigravity-IDE"
+        state_dir = root / "state"
+        apps_dir = root / "applications"
+        user_desk = root / "Desktop"
+        user_desk.mkdir(parents=True, exist_ok=True)
+
+        exe = desk_dir / "antigravity"
+        exe.parent.mkdir(parents=True, exist_ok=True)
+        exe.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        exe.chmod(exe.stat().st_mode | stat.S_IXUSR)
+
+        wrapper = root / "antigravity-wrapper"
+        wrapper.write_text(f'#!/bin/bash\nexec "{exe}" --no-sandbox "$@"\n', encoding="utf-8")
+        assert rtl._extract_exec_target_from_wrapper(wrapper) == exe.resolve(), "Wrapper target extraction failed"
+
+        ok, msg = rtl.install_linux_shortcuts(
+            desk_dir, ide_dir, state_dir, apps_dir=apps_dir, user_desktop_dir=user_desk
+        )
+        assert ok, msg
+        app_entry = apps_dir / "antigravity-rtl.desktop"
+        desk_entry = user_desk / "antigravity-rtl.desktop"
+        assert app_entry.exists() and desk_entry.exists(), "Linux .desktop shortcuts not created"
+        assert "Name=Antigravity RTL" in app_entry.read_text(encoding="utf-8")
+
+        ok2, msg2 = rtl.restore_linux_shortcuts(apps_dir=apps_dir, user_desktop_dir=user_desk)
+        assert ok2, msg2
+        assert not app_entry.exists() and not desk_entry.exists(), "Linux .desktop shortcuts not removed"
+        print("  [PASS] Linux wrapper extraction & .desktop shortcut install/restore verified")
+
+
 if __name__ == "__main__":
     print("=== Running Antigravity Persian RTL V2 Studio Verification Suite ===")
     test_desktop_asar_roundtrip_and_update()
     test_rtl_dom_and_header_toolbar()
+    test_linux_wrapper_and_desktop_shortcuts()
     print("=== ALL V2 TESTS PASSED SUCCESSFULLY ===")

@@ -12,7 +12,9 @@ import argparse
 import hashlib
 import json
 import os
+import shlex
 import shutil
+import stat
 import struct
 import subprocess
 import sys
@@ -35,14 +37,143 @@ ASSETS_DIR = SCRIPT_DIR / "assets"
 DEFAULT_STATE_DIR = SCRIPT_DIR / "state"
 
 
+def _extract_exec_target_from_wrapper(wrapper_path: Path) -> Optional[Path]:
+    """If wrapper_path is a POSIX shell script calling `exec /path/to/binary ...`, return that binary path."""
+    try:
+        head = wrapper_path.read_bytes()[:4096]
+        if not head.startswith(b"#!"):
+            return None
+        text = head.decode("utf-8", errors="ignore")
+    except OSError:
+        return None
+
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if stripped.startswith("exec "):
+            try:
+                tokens = shlex.split(stripped[5:])
+            except ValueError:
+                tokens = stripped[5:].split()
+            for tok in tokens:
+                if tok.startswith("-"):
+                    continue
+                p = Path(os.path.expandvars(os.path.expanduser(tok)))
+                if p.is_file():
+                    return p.resolve()
+    return None
+
+
+def _candidate_dir_from_which(cmd_name: str, marker_rel: str) -> Optional[Path]:
+    found = shutil.which(cmd_name)
+    if not found:
+        return None
+    p = Path(found)
+    resolved = p.resolve()
+    if (resolved.parent / marker_rel).exists():
+        return resolved.parent
+    target = _extract_exec_target_from_wrapper(p)
+    if target and (target.parent / marker_rel).exists():
+        return target.parent
+    return None
+
+
 def default_desktop_dir() -> Path:
-    local = os.environ.get("LOCALAPPDATA", "")
-    return Path(local) / "Programs" / "antigravity"
+    env_dir = os.environ.get("ANTIGRAVITY_DESKTOP_DIR")
+    if env_dir:
+        return Path(env_dir).expanduser()
+    if sys.platform == "win32":
+        local = os.environ.get("LOCALAPPDATA", "")
+        return Path(local) / "Programs" / "antigravity"
+    for cmd in ("antigravity", "Antigravity"):
+        found = _candidate_dir_from_which(cmd, "resources/app.asar")
+        if found:
+            return found
+    home = Path.home()
+    for c in (
+        home / "Downloads" / "Antigravity" / "Antigravity-x64",
+        home / ".local" / "share" / "antigravity",
+        home / ".local" / "share" / "Antigravity",
+        home / "Applications" / "Antigravity",
+        home / "Applications" / "Antigravity-x64",
+        Path("/opt/Antigravity"),
+        Path("/opt/antigravity"),
+        Path("/usr/share/antigravity"),
+        Path("/usr/lib/antigravity"),
+    ):
+        if (c / "resources" / "app.asar").exists():
+            return c
+    return Path("/opt/antigravity")
 
 
 def default_ide_dir() -> Path:
-    local = os.environ.get("LOCALAPPDATA", "")
-    return Path(local) / "Programs" / "Antigravity IDE"
+    env_dir = os.environ.get("ANTIGRAVITY_IDE_DIR")
+    if env_dir:
+        return Path(env_dir).expanduser()
+    if sys.platform == "win32":
+        local = os.environ.get("LOCALAPPDATA", "")
+        return Path(local) / "Programs" / "Antigravity IDE"
+    for cmd in ("antigravity-ide", "Antigravity-IDE"):
+        found = _candidate_dir_from_which(cmd, "resources/app")
+        if found:
+            return found
+    home = Path.home()
+    for c in (
+        home / ".local" / "share" / "antigravity-ide",
+        home / ".local" / "share" / "Antigravity IDE",
+        home / "Applications" / "Antigravity-IDE",
+        Path("/opt/antigravity-ide"),
+        Path("/opt/Antigravity IDE"),
+        Path("/usr/share/antigravity-ide"),
+        Path("/usr/lib/antigravity-ide"),
+    ):
+        if (c / "resources" / "app").exists():
+            return c
+    return Path("/opt/antigravity-ide")
+
+
+def find_desktop_executable(desktop_dir: Path) -> Optional[Path]:
+    names = ("Antigravity.exe",) if sys.platform == "win32" else ("antigravity", "Antigravity", "Antigravity.exe")
+    for name in names:
+        p = desktop_dir / name
+        if p.is_file():
+            return p
+    return None
+
+
+def find_ide_executable(ide_dir: Path) -> Optional[Path]:
+    names = ("Antigravity IDE.exe",) if sys.platform == "win32" else ("antigravity-ide", "antigravity", "Antigravity IDE", "Antigravity IDE.exe")
+    for name in names:
+        p = ide_dir / name
+        if p.is_file():
+            return p
+    return None
+
+
+def find_wrapper_for_dir(cmd_name: str, app_dir: Path) -> Optional[Path]:
+    found = shutil.which(cmd_name)
+    if not found:
+        return None
+    p = Path(found)
+    target = _extract_exec_target_from_wrapper(p)
+    if target and target.parent.resolve() == app_dir.resolve():
+        return p
+    return None
+
+
+def find_linux_app_icon(app_dir: Path, is_ide: bool = False) -> str:
+    home = Path.home()
+    for c in (
+        home / ".local" / "share" / "icons" / ("antigravity-ide.png" if is_ide else "antigravity.png"),
+        home / ".local" / "share" / "icons" / "antigravity.png",
+        app_dir / "resources" / "app" / "resources" / "linux" / "code.png",
+        Path("/usr/share/pixmaps/antigravity.png"),
+        Path("/usr/share/icons/hicolor/256x256/apps/antigravity.png"),
+    ):
+        if c.is_file():
+            return str(c)
+    return "antigravity"
 
 
 def load_assets() -> Tuple[str, str, str]:
@@ -147,8 +278,8 @@ def build_preload_js_snippet(css_text: str, js_text: str) -> str:
 # Electron Fuse Check (Read-Only Safety Guard)
 # ---------------------------------------------------------------------------
 
-def is_asar_integrity_fuse_enabled(exe_path: Path) -> bool:
-    if not exe_path.exists():
+def is_asar_integrity_fuse_enabled(exe_path: Optional[Path]) -> bool:
+    if not exe_path or not exe_path.exists():
         return False
     try:
         data = exe_path.read_bytes()
@@ -340,12 +471,13 @@ def is_desktop_asar_patched(asar_path: Path) -> bool:
 
 def patch_desktop(desktop_dir: Path, state_dir: Path, force: bool = False) -> Tuple[bool, str]:
     asar_path = desktop_dir / "resources" / "app.asar"
-    exe_path = desktop_dir / "Antigravity.exe"
+    exe_path = find_desktop_executable(desktop_dir)
     if not asar_path.exists():
         return False, f"Desktop app.asar not found at {asar_path}"
 
     if is_asar_integrity_fuse_enabled(exe_path):
-        return False, "Skipped Desktop patch: EnableEmbeddedAsarIntegrityValidation fuse is active on Antigravity.exe"
+        exe_name = exe_path.name if exe_path else "Antigravity"
+        return False, f"Skipped Desktop patch: EnableEmbeddedAsarIntegrityValidation fuse is active on {exe_name}"
 
     css_text, js_text, payload_hash = load_assets()
     state = load_state(state_dir)
@@ -676,9 +808,121 @@ def get_shortcut_definitions(desktop_dir: Path, ide_dir: Path) -> List[Dict[str,
     return defs
 
 
+def resolve_linux_shortcut_dirs() -> Tuple[Path, Optional[Path]]:
+    xdg_data = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share"))
+    apps_dir = xdg_data / "applications"
+    desktop_dir = Path.home() / "Desktop"
+    return apps_dir, desktop_dir if desktop_dir.is_dir() else None
+
+
+def _build_linux_desktop_entry(name: str, exec_cmd: str, icon: str, wm_class: str, comment: str) -> str:
+    return (
+        "[Desktop Entry]\n"
+        f"Name={name}\n"
+        f"Comment={comment}\n"
+        f"Exec={exec_cmd}\n"
+        f"Icon={icon}\n"
+        "Terminal=false\n"
+        "Type=Application\n"
+        "Categories=Development;IDE;\n"
+        f"StartupWMClass={wm_class}\n"
+    )
+
+
+def install_linux_shortcuts(
+    desktop_dir: Path,
+    ide_dir: Path,
+    state_dir: Path,
+    apps_dir: Optional[Path] = None,
+    user_desktop_dir: Optional[Path] = None,
+) -> Tuple[bool, str]:
+    default_apps, default_desk = resolve_linux_shortcut_dirs()
+    apps_dir = apps_dir or default_apps
+    user_desktop_dir = user_desktop_dir if user_desktop_dir is not None else default_desk
+
+    apps_dir.mkdir(parents=True, exist_ok=True)
+    created: List[str] = []
+    py_script = str(SCRIPT_DIR / "antigravity_rtl.py")
+
+    if find_desktop_executable(desktop_dir):
+        icon = find_linux_app_icon(desktop_dir, is_ide=False)
+        exec_cmd = (
+            f"python3 {shlex.quote(py_script)} launch desktop "
+            f"--desktop-dir {shlex.quote(str(desktop_dir))} "
+            f"--state-dir {shlex.quote(str(state_dir))} -- %F"
+        )
+        content = _build_linux_desktop_entry(
+            name="Antigravity RTL",
+            exec_cmd=exec_cmd,
+            icon=icon,
+            wm_class="Antigravity",
+            comment="Antigravity (Smart Persian RTL + Vazirmatn Launcher)",
+        )
+        for target in [apps_dir / "antigravity-rtl.desktop"] + (
+            [user_desktop_dir / "antigravity-rtl.desktop"] if user_desktop_dir else []
+        ):
+            target.write_text(content, encoding="utf-8")
+            target.chmod(target.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+            created.append(str(target))
+
+    if find_ide_executable(ide_dir):
+        icon = find_linux_app_icon(ide_dir, is_ide=True)
+        exec_cmd = (
+            f"python3 {shlex.quote(py_script)} launch ide "
+            f"--ide-dir {shlex.quote(str(ide_dir))} "
+            f"--state-dir {shlex.quote(str(state_dir))} -- %F"
+        )
+        content = _build_linux_desktop_entry(
+            name="Antigravity IDE RTL",
+            exec_cmd=exec_cmd,
+            icon=icon,
+            wm_class="Antigravity",
+            comment="Antigravity IDE (Smart Persian RTL + Vazirmatn Launcher)",
+        )
+        for target in [apps_dir / "antigravity-ide-rtl.desktop"] + (
+            [user_desktop_dir / "antigravity-ide-rtl.desktop"] if user_desktop_dir else []
+        ):
+            target.write_text(content, encoding="utf-8")
+            target.chmod(target.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+            created.append(str(target))
+
+    if shutil.which("update-desktop-database"):
+        subprocess.run(["update-desktop-database", str(apps_dir)], capture_output=True)
+
+    if not created:
+        return False, "No Antigravity executable found to create Linux shortcuts."
+    return True, f"Created Linux .desktop shortcuts: {', '.join(created)}"
+
+
+def restore_linux_shortcuts(
+    apps_dir: Optional[Path] = None,
+    user_desktop_dir: Optional[Path] = None,
+) -> Tuple[bool, str]:
+    default_apps, default_desk = resolve_linux_shortcut_dirs()
+    apps_dir = apps_dir or default_apps
+    user_desktop_dir = user_desktop_dir if user_desktop_dir is not None else default_desk
+
+    removed = 0
+    names = ("antigravity-rtl.desktop", "antigravity-ide-rtl.desktop")
+    dirs = [apps_dir] + ([user_desktop_dir] if user_desktop_dir else [])
+    for d in dirs:
+        for name in names:
+            p = d / name
+            if p.exists():
+                p.unlink()
+                removed += 1
+
+    if shutil.which("update-desktop-database") and apps_dir.exists():
+        subprocess.run(["update-desktop-database", str(apps_dir)], capture_output=True)
+
+    return True, f"Removed {removed} Linux RTL .desktop shortcut(s)"
+
+
 def install_shortcuts(desktop_dir: Path, ide_dir: Path, state_dir: Path) -> Tuple[bool, str]:
+    if sys.platform.startswith("linux"):
+        return install_linux_shortcuts(desktop_dir, ide_dir, state_dir)
     if sys.platform != "win32":
-        return False, "Shortcut installation is only supported on Windows."
+        return False, "Shortcut installation is only supported on Windows and Linux."
 
     backup_dir = state_dir / "shortcut_backups"
     backup_dir.mkdir(parents=True, exist_ok=True)
@@ -726,8 +970,10 @@ def install_shortcuts(desktop_dir: Path, ide_dir: Path, state_dir: Path) -> Tupl
 
 
 def restore_shortcuts(desktop_dir: Path, ide_dir: Path, state_dir: Path) -> Tuple[bool, str]:
+    if sys.platform.startswith("linux"):
+        return restore_linux_shortcuts()
     if sys.platform != "win32":
-        return False, "Shortcut restore is only supported on Windows."
+        return False, "Shortcut restore is only supported on Windows and Linux."
 
     backup_dir = state_dir / "shortcut_backups"
     defs = get_shortcut_definitions(desktop_dir, ide_dir)
@@ -776,28 +1022,37 @@ def restore_shortcuts(desktop_dir: Path, ide_dir: Path, state_dir: Path) -> Tupl
 def launch_app(which: str, desktop_dir: Path, ide_dir: Path, state_dir: Path, extra_args: List[str]) -> int:
     if which == "desktop":
         patch_desktop(desktop_dir, state_dir, force=False)
-        exe = desktop_dir / "Antigravity.exe"
+        wrapper = None if sys.platform == "win32" else find_wrapper_for_dir("antigravity", desktop_dir)
+        exe = wrapper or find_desktop_executable(desktop_dir)
         cwd = desktop_dir
     elif which == "ide":
         patch_ide(ide_dir, state_dir, force=False)
-        exe = ide_dir / "Antigravity IDE.exe"
+        wrapper = None if sys.platform == "win32" else find_wrapper_for_dir("antigravity-ide", ide_dir)
+        exe = wrapper or find_ide_executable(ide_dir)
         cwd = ide_dir
     else:
         raise ValueError(f"Unknown launch target: {which}")
 
-    if not exe.exists():
+    if not exe or not exe.exists():
         return 1
 
-    creationflags = 0
     if sys.platform == "win32":
         creationflags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
-
-    subprocess.Popen(
-        [str(exe), *extra_args],
-        cwd=str(cwd),
-        close_fds=True,
-        creationflags=creationflags,
-    )
+        subprocess.Popen(
+            [str(exe), *extra_args],
+            cwd=str(cwd),
+            close_fds=True,
+            creationflags=creationflags,
+        )
+    else:
+        subprocess.Popen(
+            [str(exe), *extra_args],
+            cwd=str(cwd),
+            close_fds=True,
+            start_new_session=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
     return 0
 
 
@@ -860,7 +1115,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     exit_code = 0
     if args.cmd == "patch":
-        if not args.no_shortcuts and sys.platform == "win32":
+        if not args.no_shortcuts and (sys.platform == "win32" or sys.platform.startswith("linux")):
             sc_ok, sc_msg = install_shortcuts(args.desktop_dir, args.ide_dir, args.state_dir)
             print(f"[Shortcuts] {sc_msg}")
             if not sc_ok:
