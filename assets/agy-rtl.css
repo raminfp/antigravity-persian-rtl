@@ -393,7 +393,7 @@ html:not([data-agy-rtl-enabled="0"]) [data-agy-fa="1"] [data-slot-out] {
   z-index: 2147483645;
   width: 296px;
   box-sizing: border-box;
-  direction: rtl !important;
+  direction: ltr !important;
   text-align: right !important;
   font-family: 'Vazirmatn', 'Vazir', 'Segoe UI', sans-serif !important;
   font-size: 12px;
